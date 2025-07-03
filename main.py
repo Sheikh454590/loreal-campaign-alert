@@ -1,50 +1,33 @@
 import os
-import time
-import random
 import requests
 from telegram import Bot
-from telegram.constants import ParseMode
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+# ✅ Step 1: Fetch token and chat_id from environment
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHAT_ID = os.environ.get("CHAT_ID")
 
+# ✅ Step 2: Validate environment variables
+if not BOT_TOKEN:
+    raise ValueError("❌ BOT_TOKEN not found in environment variables.")
+if not CHAT_ID:
+    raise ValueError("❌ CHAT_ID not found in environment variables.")
+
+# ✅ Step 3: Initialize bot
 bot = Bot(token=BOT_TOKEN)
 
-def generate_upi():
-    banks = ["@ybl", "@ibl", "@okaxis", "@paytm", "@upi", "@oksbi"]
-    prefix = ''.join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=random.randint(6, 10)))
-    return prefix + random.choice(banks)
-
-def check_campaign(upi_id):
+# ✅ Step 4: Sample Redemption check request
+def check_campaign():
     try:
-        url = "https://web.myfidelity.in/loreal/loreal-campaign/api/redeem"
-        payload = {
-            "upi": upi_id,
-            "redeem_option": "cashback",
-            "referral_code": ""
-        }
-        headers = {
-            "Content-Type": "application/json",
-            "appversion": "1.0",
-            "appname": "loreal",
-            "channel": "WEB"
-        }
-        res = requests.post(url, json=payload, headers=headers)
-        data = res.json()
-        message = data.get("message", "No message")
-        print(f"[{upi_id}] ➜ {message}")
-        return message
+        res = requests.post(
+            "https://web.myfidelity.in/api/v1/loreal_standup/redemption",
+            json={"redemptionType": "CASHBACK"},
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
+        return res.text
     except Exception as e:
-        return f"Error: {e}"
+        return f"❌ Error: {e}"
 
-def send_to_telegram(msg):
-    try:
-        bot.send_message(chat_id=CHAT_ID, text=f"📢 Campaign Check Result\n\n{msg}", parse_mode=ParseMode.MARKDOWN)
-    except Exception as e:
-        print(f"Telegram Error: {e}")
-
-while True:
-    upi = generate_upi()
-    result = check_campaign(upi)
-    send_to_telegram(f"🔎 UPI Checked: {upi}\n🧾 Server Says: {result}")
-    time.sleep(3600)  # every 1 hour
+# ✅ Step 5: Send result to Telegram
+status = check_campaign()
+bot.send_message(chat_id=CHAT_ID, text=f"🧾 Redemption Status:\n{status}")
