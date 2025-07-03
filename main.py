@@ -1,43 +1,50 @@
 import requests
 import random
 import string
-import json
-import telegram
+import schedule
+import time
+import os
+from telegram import Bot
 
-# Telegram setup
-BOT_TOKEN = '8151085825:AAE42arT42Tu0TvFX5jHmf01Xa29rUrApRI'
-USER_ID = '6314543436'
-bot = telegram.Bot(token=BOT_TOKEN)
+TOKEN = os.environ.get("TOKEN")
+CHAT_ID = os.environ.get("CHAT_ID")
+bot = Bot(token=TOKEN)
 
-# Create random UPI
-def random_upi():
-    prefix = ''.join(random.choices(string.ascii_lowercase, k=random.randint(6, 10)))
-    suffixes = ['@ibl', '@ybl', '@axl', '@paytm', '@upi', '@oksbi', '@okaxis']
-    return prefix + random.choice(suffixes)
+def generate_random_upi():
+    prefix = ''.join(random.choices(string.ascii_lowercase, k=random.randint(6, 9)))
+    suffix = random.choice(["@ybl", "@ibl", "@paytm", "@oksbi", "@okaxis"])
+    return prefix + suffix
 
-# Main function
 def check_campaign():
-    upi = random_upi()
-    url = "https://web.myfidelity.in/api/v1/user/save-upi"
+    upi = generate_random_upi()
     headers = {
         "Content-Type": "application/json",
         "appversion": "1.0",
         "appname": "loreal",
         "channel": "WEB"
     }
+
     payload = {
-        "vpa": upi
+        "upi_id": upi
     }
 
     try:
-        res = requests.post(url, headers=headers, json=payload, timeout=10)
+        res = requests.post("https://web.myfidelity.in/api/loreal/check", json=payload, headers=headers, timeout=10)
         data = res.json()
+
+        status = data.get("message", "No message")
+        msg = f"📢 Campaign Response: {status}\n🔁 UPI Used: {upi}"
+        bot.send_message(chat_id=CHAT_ID, text=msg)
+
     except Exception as e:
-        bot.send_message(chat_id=USER_ID, text=f"❌ Error while calling API:\n{str(e)}")
-        return
+        bot.send_message(chat_id=CHAT_ID, text=f"❌ Error: {str(e)}")
 
-    msg = f"🕒 Checked UPI: {upi}\n📢 Campaign Response:\njson\n{json.dumps(data, indent=2)}"
-    bot.send_message(chat_id=USER_ID, text=msg, parse_mode="Markdown")
+# Schedule to run every 1 hour
+schedule.every(1).hours.do(check_campaign)
 
-# Run the check
+# First run instantly
 check_campaign()
+
+while True:
+    schedule.run_pending()
+    time.sleep(5)
