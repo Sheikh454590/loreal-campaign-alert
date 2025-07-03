@@ -1,36 +1,50 @@
 import os
-import random
 import time
+import random
 import requests
 from telegram import Bot
+from telegram.constants import ParseMode
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 bot = Bot(token=BOT_TOKEN)
 
-def random_upi():
-    banks = ["@ybl", "@axl", "@paytm", "@ibl", "@okicici", "@oksbi"]
-    name = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=random.randint(8, 11)))
-    return name + random.choice(banks)
+def generate_upi():
+    banks = ["@ybl", "@ibl", "@okaxis", "@paytm", "@upi", "@oksbi"]
+    prefix = ''.join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=random.randint(6, 10)))
+    return prefix + random.choice(banks)
 
-def check_campaign(upi):
-    url = "https://web.myfidelity.in/api/upi-check"  # Example endpoint
-    payload = {"upi": upi}
+def check_campaign(upi_id):
     try:
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("message", "No message")
-        else:
-            return f"Error: {response.status_code}"
+        url = "https://web.myfidelity.in/loreal/loreal-campaign/api/redeem"
+        payload = {
+            "upi": upi_id,
+            "redeem_option": "cashback",
+            "referral_code": ""
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "appversion": "1.0",
+            "appname": "loreal",
+            "channel": "WEB"
+        }
+        res = requests.post(url, json=payload, headers=headers)
+        data = res.json()
+        message = data.get("message", "No message")
+        print(f"[{upi_id}] ➜ {message}")
+        return message
     except Exception as e:
-        return f"Exception: {str(e)}"
+        return f"Error: {e}"
+
+def send_to_telegram(msg):
+    try:
+        bot.send_message(chat_id=CHAT_ID, text=f"📢 Campaign Check Result\n\n{msg}", parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        print(f"Telegram Error: {e}")
 
 while True:
-    upi = random_upi()
+    upi = generate_upi()
     result = check_campaign(upi)
-    msg = f"🔁 Random UPI Checked: {upi}\n📢 Campaign Response: {result}"
-    print(msg)
-    bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode="Markdown")
-    time.sleep(3600)  # Wait 1 hour
+    send_to_telegram(f"🔎 UPI Checked: {upi}\n🧾 Server Says: {result}")
+    time.sleep(3600)  # every 1 hour
