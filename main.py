@@ -1,31 +1,43 @@
 import requests
+import random
+import string
+import json
+import telegram
 
-# 👉 Replace with your token & ID
-BOT_TOKEN = "8151085825:AAE42arT42Tu0TvFX5jHmf01Xa29rUrApRI"
-USER_ID = "6314543436"
+# Telegram setup
+BOT_TOKEN = '8151085825:AAE42arT42Tu0TvFX5jHmf01Xa29rUrApRI'
+USER_ID = '6314543436'
+bot = telegram.Bot(token=BOT_TOKEN)
 
-def send_telegram(msg):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    data = {
-        "chat_id": USER_ID,
-        "text": msg
-    }
-    try:
-        requests.post(url, data=data)
-    except Exception as e:
-        print("Telegram send failed:", e)
+# Create random UPI
+def random_upi():
+    prefix = ''.join(random.choices(string.ascii_lowercase, k=random.randint(6, 10)))
+    suffixes = ['@ibl', '@ybl', '@axl', '@paytm', '@upi', '@oksbi', '@okaxis']
+    return prefix + random.choice(suffixes)
 
+# Main function
 def check_campaign():
-    url = "https://web.myfidelity.in/loreal/api/redemption/getStatus"
-    try:
-        res = requests.get(url, timeout=10)
-        data = res.json()
-        message = f"📢 Campaign Response:\n\n📝 Status: {data.get('msg')}\n📦 Code: {data.get('code')}"
-        send_telegram(message)
-        print("✅ Telegram sent:", message)
-    except Exception as e:
-        send_telegram(f"⚠ Error checking campaign: {e}")
-        print("❌ Error:", e)
+    upi = random_upi()
+    url = "https://web.myfidelity.in/api/v1/user/save-upi"
+    headers = {
+        "Content-Type": "application/json",
+        "appversion": "1.0",
+        "appname": "loreal",
+        "channel": "WEB"
+    }
+    payload = {
+        "vpa": upi
+    }
 
-if __name__ == "__main__":
-    check_campaign()
+    try:
+        res = requests.post(url, headers=headers, json=payload, timeout=10)
+        data = res.json()
+    except Exception as e:
+        bot.send_message(chat_id=USER_ID, text=f"❌ Error while calling API:\n{str(e)}")
+        return
+
+    msg = f"🕒 Checked UPI: {upi}\n📢 Campaign Response:\njson\n{json.dumps(data, indent=2)}"
+    bot.send_message(chat_id=USER_ID, text=msg, parse_mode="Markdown")
+
+# Run the check
+check_campaign()
